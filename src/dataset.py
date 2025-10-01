@@ -9,10 +9,10 @@ from torch_geometric.data import Data
 from torch.utils.data import Dataset, DataLoader, Subset
 import matplotlib.pyplot as plt
 from collections import OrderedDict
-from utilities import *
-from utilities3 import *
-from plotting import plot_graph
-from lipschitz import lifshitz_embedding
+from .utilities import *
+from .utilities3 import *
+from .plotting import plot_graph
+from .lipschitz import lifshitz_embedding
 
 class Dataset(torch.utils.data.Dataset):
 
@@ -169,7 +169,7 @@ class Dataset(torch.utils.data.Dataset):
                 
             if not os.path.exists(os.path.join(self.data_dir, 'chunk_0.pt')) and self.noise_std is None:
             # graph construction
-                pos_ = self.get_grid(self.coeffs.shape, device= 'cuda')[0].flatten(0,1)
+                pos_ = self.get_grid(self.coeffs.shape, device= 'cpu')[0].flatten(0,1)
 
                 edge_index = knn_graph(pos_,  k = self.k , loop=False)            
                 self.edge_index = to_undirected(edge_index, num_nodes=pos_.shape[0])
