@@ -137,50 +137,8 @@ PATH_TEST = None
 noise_std = None
 # noise_std = 0.008
 
-if dataset_name == 'airfoil':
-
-    PATH = "../data/naca"
-    if noise_std is None:
-        INPUT_X = PATH + '/NACA_Cylinder_X.npy'
-        INPUT_Y = PATH + '/NACA_Cylinder_Y.npy'
-        OUTPUT_Sigma = PATH + '/NACA_Cylinder_Q.npy'
-        radius_train = 0.055
-        radius_test = 0.055
-    else:
-
-        INPUT_X = PATH + f'/NACA_Cylinder_X_noised_{noise_std}.npy'
-        INPUT_Y = PATH + f'/NACA_Cylinder_Y_noised_{noise_std}.npy'
-        OUTPUT_Sigma = PATH + f'/NACA_Cylinder_Q_noised_{noise_std}.npy'
-        radius_train = 0.055
-        radius_test = 0.055
-
-
-elif dataset_name == 'elasticity':
-    PATH = '../data/elasticity/Meshes'
-    OUTPUT_Sigma = PATH+'/Random_UnitCell_sigma_10.npy'
-    PATH_XY = PATH+ '/Random_UnitCell_XY_10.npy'
-    PATH_rr = PATH+ '/Random_UnitCell_rr_10.npy'
-    radius_train = 0.08
-    radius_test = 0.08
-
-elif dataset_name == 'pipe':
-    if noise_std is None:
-        PATH = "/home/subhankar/data/pipe/pipe"
-        INPUT_X = PATH +'/Pipe_X.npy'
-        INPUT_Y = PATH + '/Pipe_Y.npy'
-        OUTPUT_Sigma = PATH + '/Pipe_Q.npy'
-        radius_train = 0.08
-        radius_test = 0.08
-    else:
-        PATH = "/home/subhankar/data/pipe/pipe"
-        INPUT_X = PATH +f'/Pipe_X_noised_{noise_std}.npy'
-        INPUT_Y = PATH + f'/Pipe_Y_noised_{noise_std}.npy'
-        OUTPUT_Sigma = PATH + f'/Pipe_Q_noised_{noise_std}.npy'
-        radius_train = 0.08
-        radius_test = 0.08
-        
     
-elif dataset_name == 'darcy':
+if dataset_name == 'darcy':
     if noise_std is None:
         PATH = "../data/darcy/Darcy_421/"
         PATH_TRAIN = PATH +'piececonst_r421_N1024_smooth1.mat'
@@ -209,14 +167,9 @@ cropped = True
 s =[4.0]
 g_type = 'knn'
 
-if dataset_name == 'airfoil':
-    k = 30
-if dataset_name == 'elasticity':
-    k = 20
+
 if dataset_name == 'darcy':
     k = 20
-if dataset_name == 'pipe':
-    k = 25
 # Create dataset and dataloaders
 dataset = Dataset(INPUT_X, INPUT_Y, OUTPUT_Sigma, PATH_TRAIN, PATH_TEST, ntrain, ntest, radius_train, k, 
                   radius_test,  s, 'GraphFNO', path_xy= PATH_XY, path_rr = PATH_rr,
@@ -392,111 +345,7 @@ for ep in range(start_epoch, epochs):
         logging.info(f"edge_weight min max : {model.edge_weight.min()} {model.edge_weight.max()}")
         
     if ep%20 ==0:
-
-        if dataset_name == 'airfoil' or dataset_name == 'pipe':
-            indices = random.sample(range(ntest), 4)
-
-            r1 = 1
-            r2 = 1
-            s1 = dataset.sx
-            s2 = dataset.sy
-
-            fig, ax = plt.subplots(nrows=3, ncols=4, figsize=(25, 15))
-
-            for col, ind in enumerate(indices):
-                # Decode normalized data if necessary
-                if normalized:
-                    batch.x = dataset.x_normalizer.decode(batch.x)
-
-                # Reshape test sample data
-                x_test = plot_data[ind]['x'].view(s1, s2, 2)
-                y_test = plot_data[ind]['y'].view(s1, s2)
-                X = x_test[:, :, 0].squeeze().detach().cpu().numpy()
-                Y = x_test[:, :, 1].squeeze().detach().cpu().numpy()
-                truth = y_test.squeeze().detach().cpu().numpy()
-                pred = plot_data[ind]['out'].view(s1, s2).detach().cpu().numpy()
-                
-                
-                # Determine color scale range based on the min and max values of truth and prediction
-                vmin = min(truth.min(), pred.min())
-                vmax = max(truth.max(), pred.max())
-                
-                # Plot ground truth
-                pic0 = ax[0, col].pcolormesh(X, Y, truth, cmap='viridis', shading='gouraud', vmin=vmin, vmax=vmax)
-                cbar0 = fig.colorbar(pic0, ax=ax[0, col])
-                # Plot predicted values
-                pic1 = ax[1, col].pcolormesh(X, Y, pred, cmap='viridis', shading='gouraud', vmin=vmin, vmax=vmax)
-                cbar1 = fig.colorbar(pic1, ax=ax[1, col])
-                # Plot prediction error
-                pic2 = ax[2, col].pcolormesh(X, Y, (pred - truth)**2, cmap='viridis', shading='gouraud')
-                cbar2 = fig.colorbar(pic2, ax=ax[2, col])
-
-            # Set column-wise titles
-            for col, ind in enumerate(indices):
-                ax[0, col].set_title(f'Test Example: {col}', fontsize=20, fontweight='bold')
-
-            # Set row-wise titles
-            row_titles = [ 'Input', 'Truth', 'Prediction', 'Error']
-            for row, title in enumerate(row_titles):
-                ax[row, 0].set_ylabel(title, fontsize=20, rotation=90, fontweight='bold')
-
-            # Adjust layout and save the figure
-            plt.tight_layout()
-            testloss = test_l2_61 / len(test_loader)
-            plt.savefig(path_image_test61 + f'test_at_epoch_{ep}_loss_{testloss:.4f}.png')
-            plt.close()
-
-
-        if dataset_name == 'elasticity':
-            
-            indices = random.sample(range(ntest), 4)
-
-            fig, ax = plt.subplots(nrows=3, ncols=4, figsize=(25, 15))
-
-            for col, ind in enumerate(indices):
-                # Decode normalized data if necessary
-                if normalized:
-                    batch.x = dataset.x_normalizer.decode(batch.x)
-
-                mesh = plot_data[ind]['x'].squeeze(0)
-                sigma = plot_data[ind]['y']
-                out = plot_data[ind]['out']
-                XY = mesh.detach().cpu().numpy()
-                
-                truth = sigma.squeeze().detach().cpu().numpy()
-                pred = out.view(batch_size, -1, 1).squeeze().detach().cpu().numpy()
-
-                # Scatter plot for Ground Truth
-                sc0 = ax[0, col].scatter(XY[:, 0], XY[:, 1], c=truth, cmap='RdBu_r', edgecolor='w', lw=0.1)
-                cbar0 = fig.colorbar(sc0, ax=ax[0, col])
-                # cbar0.set_label('Ground Truth', fontsize=14, fontweight='bold')
-                # ax[0, col].set_title(f'Index: {ind}', fontsize=14, fontweight='bold')
-
-                # Scatter plot for Predictions
-                sc1 = ax[1, col].scatter(XY[:, 0], XY[:, 1], c=pred, cmap='RdBu_r', edgecolor='w', lw=0.1, vmin=truth.min(), vmax=truth.max())
-                cbar1 = fig.colorbar(sc1, ax=ax[1, col])
-                # cbar1.set_label('Predicted Values', fontsize=14, fontweight='bold')
-
-                # Scatter plot for Error
-                sc2 = ax[2, col].scatter(XY[:, 0], XY[:, 1], c=(truth - pred)**2, cmap='RdBu_r', edgecolor='w', lw=0.1)
-                cbar2 = fig.colorbar(sc2, ax=ax[2, col])
-                # cbar2.set_label('Prediction Error', fontsize=14, fontweight='bold')
-
-            # Set column-wise titles
-            for col, ind in enumerate(indices):
-                ax[0, col].set_title(f'Test Example: {col}', fontsize=20, fontweight='bold')
-
-            # Set row-wise titles
-            row_titles = ['Truth', 'Prediction', 'Error']
-            for row, title in enumerate(row_titles):
-                ax[row, 0].set_ylabel(title, fontsize=20, rotation=90, fontweight='bold')
-
-            # Adjust layout and save the figure
-            plt.tight_layout()
-            testloss = test_l2_61 / len(test_loader)
-            plt.savefig(path_image_test61 + f'test_at_epoch_{ep}_loss_{testloss:.4f}.png')
-            plt.close()
-            
+    
         if dataset_name == "darcy" and noise_std is None:
             indices = random.sample(range(ntest), 4)
 

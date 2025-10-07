@@ -39,82 +39,7 @@ class Dataset(torch.utils.data.Dataset):
         self.old_chunk_size = old_chunk_size
         self.k = k
         
-
-
-        if self.dataset_name == 'airfoil':
-            # self.nx = 50
-            # self.ny = 20
-            self.nx= 15
-            self.ny =12
-            self.pos_x = torch.tensor(np.load(path_x_coords), dtype=torch.float)
-            self.pos_y = torch.tensor(np.load(path_y_coords), dtype=torch.float)
-            self.cropped = cropped
-            if self.cropped and self.noise_std is None:
-                self.pos_unflatten = torch.stack([self.pos_x, self.pos_y], dim=-1)[:self.N_samples][:, self.nx:-self.nx, :-self.ny]
-                self.pos = torch.stack([self.pos_x, self.pos_y], dim=-1)[:self.N_samples][:, self.nx:-self.nx, :-self.ny].flatten(1,2)
-                self.y = torch.tensor(np.load(path_sigma), dtype=torch.float)[:, 4]
-                self.y = self.y[:self.N_samples][:, self.nx:-self.nx, :-self.ny].flatten(1,2)
-                i = 0
-                plot_airfoil(self.pos[i].unsqueeze(0), self.y[i], f'./plot_{i}.png')
-                print(f" dataset pos shape: {self.pos[i].shape}")  # Should match (sx, sy, 2) for 2D grids
-                print(f"dataset airfoil pos_unflatten shape: {self.pos_unflatten[i].shape}")  # Should be (sx, sy, 2)
-                print(f"dataset airfoil y shape: {self.y[i].shape}")  # Should match (sx * sy)
-                print("Dataset pos:", self.pos[i][:10])
-                print("Dataset pos_unflatten:", self.pos_unflatten[i][:10])  # Slice for readability
-                print("Dataset y:", self.y[i][:10])
-                breakpoint()
-                self.sx = self.pos_unflatten.shape[1]
-                self.sy = self.pos_unflatten.shape[2]
-                self.N = self.sx * self.sy
-                
-
-            elif not self.cropped and self.noise_std is not None:
-                self.pos_unflatten = torch.stack([self.pos_x, self.pos_y], dim=-1)[:self.N_samples]
-                self.pos = torch.stack([self.pos_x, self.pos_y], dim=-1)[:self.N_samples].flatten(1,2)
-                self.y = torch.tensor(np.load(path_sigma), dtype=torch.float)[:, 4]
-                self.y = self.y[:self.N_samples].flatten(1,2)
-                self.sx = self.pos_unflatten.shape[1]
-                self.sy = self.pos_unflatten.shape[2]
-                self.N = self.sx * self.sy
-
-            else:
-                self.pos_unflatten = torch.stack([self.pos_x, self.pos_y], dim=-1)[:self.N_samples]
-                self.pos = torch.stack([self.pos_x, self.pos_y], dim=-1)[:self.N_samples].flatten(1,2)
-                self.y = torch.tensor(np.load(path_sigma), dtype=torch.float)
-                self.y = self.y[:self.N_samples].flatten(1,2)
-                self.sx = self.pos_unflatten.shape[1]
-                self.sy = self.pos_unflatten.shape[2]
-                self.N = self.sx * self.sy
-                
-            
-            
-
-        if self.dataset_name == 'elasticity':
-            self.pos = torch.tensor(np.load(path_xy), dtype =torch.float).permute(2,0,1)
-            self.rr = torch.tensor(np.load(path_rr), dtype = torch.float).permute(1,0)
-            self.y = torch.tensor(np.load(path_sigma), dtype = torch.float).permute(1,0).unsqueeze(-1)
-
-            self.y = self.y[:self.N_samples]
-
-            self.N =self.pos.shape[1]
-            self.sx = 32
-            self.sy = 32
-
-
-        if self.dataset_name == 'pipe':
-            self.pos_x = torch.tensor(np.load(path_x_coords), dtype=torch.float)
-            self.pos_y = torch.tensor(np.load(path_y_coords), dtype=torch.float)
-            if self.noise_std is None:
-                self.y = torch.tensor(np.load(path_sigma), dtype=torch.float)[:, 0].flatten(1,2)
-            else:
-                self.y = torch.tensor(np.load(path_sigma), dtype=torch.float).flatten(1,2)
-                
-            self.pos = torch.stack([self.pos_x, self.pos_y], dim=-1)[:self.N_samples].flatten(1,2)
-            self.y = self.y[:self.N_samples]
-            self.N =self.pos.shape[1]
-            self.sx = self.pos_x.shape[1]
-            self.sy = self.pos_x.shape[2]
-            
+    
         if self.dataset_name == 'darcy':
 
             r=5
@@ -196,19 +121,6 @@ class Dataset(torch.utils.data.Dataset):
                     self.lambdas, self.U = calculate_lambdas_U_truncated_edgeweight_sparse(edge_index, self.dist, self.N)
                 else:
                     self.lambdas, self.U = calculate_lambdas_U_truncated_sparse(edge_index, num_nodes=self.N)
-
-
-
-
-
-        if self.dataset_name == 'plasticity':
-            pass
-
-
-
-        if self.dataset_name == 'navier-stokes':
-            pass
- 
 
 
         self.chunk_size = new_chunk_Size 
@@ -383,35 +295,6 @@ class Dataset(torch.utils.data.Dataset):
         # edge_index = radius_graph(pos,  self.radius_test, loop=False, max_num_neighbors=35)
         # k = 35  , for cropped # k = 45 for non-cropped
 
-        if self.dataset_name == 'airfoil':
-            if self.g_type == 'knn' and self.cropped == False and self.noise_std is None:
-                # edge_index = knn_graph(pos,  k = 45, loop=False)
-                edge_index = knn_graph(pos,  k = self.k, loop=False)
-
-            elif self.g_type == 'knn' and self.cropped == True and self.noise_std is None:
-                # edge_index = knn_graph(pos,  k = 35, loop=False)
-                edge_index = knn_graph(pos,  k = self.k, loop=False)
-            else:
-                edge_index = knn_graph(pos,  k = self.k, loop=False)
-                # edge_index = knn_graph(pos,  k = 40, loop=False) # 35 <= k <=55 # 50 may work well
-
-        if self.dataset_name == 'elasticity':
-            if self.g_type =='radius':
-                edge_index = radius_graph(pos.cpu(), self.radius_test, loop=False)
-            elif self.g_type == 'knn':
-                edge_index = knn_graph(pos.cpu(),  k = self.k, loop=False)
-
-            else:
-                pass
-
-        if self.dataset_name == 'pipe':
-
-            if self.g_type =='radius':
-                edge_index = radius_graph(pos, self.radius_test, loop=False)
-            elif self.g_type == 'knn':
-                edge_index = knn_graph(pos,  k = self.k, loop=False)
-            else:
-                pass
         
         if self.dataset_name == 'darcy' and self.noise_std is not None:
 
@@ -494,25 +377,7 @@ class Dataset(torch.utils.data.Dataset):
                 lambdas, U = calculate_lambdas_U_truncated_sparse(edge_index, num_nodes=self.N)
                 print('U.shape',U.shape)
         
-        
-        
-        
-                
-        if self.dataset_name == 'elasticity':
-            data_dict = {
-                'x': self.x[index],
-                'y': self.y[index],
-                'lambdas': lambdas,
-                'U': U,
-                'radius_test': self.radius_test,
-                'edge_index' : edge_index,
-                'edge_weight' : edge_weight,
-                'edge_dist'  : dist,
-                'lifshitz_embedding': lips_embed,
-                'rr': self.rr[index],
-                'pos': self.pos[index]
-            }
-        elif self.dataset_name == 'darcy' and self.noise_std is None:
+        if self.dataset_name == 'darcy' and self.noise_std is None:
             data_dict = {
                 'x': self.x[index],
                 'y': self.y[index],
