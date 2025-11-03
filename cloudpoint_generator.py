@@ -125,6 +125,15 @@ def compute_linear_pressure(points, P_west, P_east, x_min, x_max):
     P = P_west + (x - x_min) / (x_max - x_min) * (P_east - P_west)
     return P
 
+def normalize_points(points, x_min=-500, x_max=500):
+    """
+    Normalize 3D points so that x, y, z coordinates range from -1 to 1.
+    Assumes input domain ranges between x_min and x_max (default: -500 to 500).
+    """
+    # Apply normalization elementwise
+    return 2 * (points - x_min) / (x_max - x_min) - 1
+
+
 F1_points = points_on_plane(frac_normals[0,0], frac_normals[0,1], frac_normals[0,2], Frac1[0,:], 3)
 F2_points = points_on_plane(frac_normals[1,0], frac_normals[1,1], frac_normals[1,2], Frac2[0,:], 1)
 F3_points = points_on_plane(frac_normals[2,0], frac_normals[2,1], frac_normals[2,2], Frac3[0,:], 3)
@@ -139,6 +148,12 @@ F3_inside = points_inside_plane(F3_points, Frac3, frac_normals[2])
 F4_inside = points_inside_plane(F4_points, Frac4, frac_normals[3])
 
 print(F1_inside.shape, F2_inside.shape, F3_inside.shape, F4_inside.shape)
+
+F1_inside_normal = normalize_points(F1_inside)
+F2_inside_normal = normalize_points(F2_inside)
+F3_inside_normal = normalize_points(F3_inside)
+F4_inside_normal = normalize_points(F4_inside)
+
 
 Pressure_West = 1.001e6
 Pressure_East = 1.000e6
@@ -161,6 +176,46 @@ F2_aperture = np.full_like(F2_pressure,Apertures[1])
 F3_aperture = np.full_like(F3_pressure,Apertures[2])
 F4_aperture = np.full_like(F4_pressure,Apertures[3])
 print(F1_aperture.shape, F2_aperture.shape, F3_aperture.shape, F4_aperture.shape)
+
+
+# %%
+
+
+# Stack the 3D coordinates (x, y, z) for all points into a single array
+all_points_3d = np.vstack([F1_inside, F2_inside, F3_inside, F4_inside])
+
+all_points_normal = np.vstack([F1_inside_normal, F2_inside_normal, F3_inside_normal, F4_inside_normal])
+all_pressure = np.hstack([F1_pressure, F2_pressure, F3_pressure, F4_pressure])
+all_permeability = np.hstack([F1_permeability, F2_permeability, F3_permeability, F4_permeability])
+all_aperture = np.hstack([F1_aperture, F2_aperture, F3_aperture, F4_aperture])
+
+# You might want to combine the normalized points (Input Features)
+# into a single array for a machine learning model:
+# First, reshape the 1D arrays to be 2D columns (N, 1)
+all_pressure_col = all_pressure.reshape(-1, 1)
+all_permeability_col = all_permeability.reshape(-1, 1)
+all_aperture_col = all_aperture.reshape(-1, 1)
+
+# Combine the normalized 3D coordinates and the physical properties into one feature matrix
+# The shape of this final feature array will be (Total_Points, 6)
+all_input_features = np.hstack([
+    all_points_normal,      # Normalized x, y, z coordinates (3 columns)
+    all_permeability_col,   # Permeability (1 column)
+    all_aperture_col,        # Aperture (1 column)
+    all_pressure_col
+])
+
+# Combine the normalized points and concentration into a single array for training (features and target)
+# The shape will be (Total_Points, 6) if you use just coordinates and pressure
+# features_and_pressure = np.hstack([all_points_normal, all_pressure_col])
+
+# Print the shape of the main stacked arrays for verification
+print("-" * 40)
+print(f"Total number of points: {all_points_3d.shape[0]}")
+print(f"Shape of all_points_3d: {all_points_3d.shape}")
+print(f"Shape of all_points_normal: {all_points_normal.shape}")
+print(f"Shape of all_input_features (x_norm, y_norm, z_norm, K, a, p): {all_input_features.shape}")
+print("-" * 40)
 
 
 # %%
@@ -196,3 +251,125 @@ plt.ylabel('Pressure (Pa)')
 plt.title('Pressure gradient across Frac1')
 plt.legend()
 plt.show()
+
+
+# %%
+
+import pandas as pd
+import numpy as np
+from scipy.io import savemat
+
+file_name = "U_sol.csv"
+
+# Read the file to get the team names from the first row (header row index 0 in the file)
+df_teams = pd.read_csv(file_name, header=0)
+
+# Dictionary mapping the starting column index of the 'Time' data
+# to the column index of the actual Team Name in the header row (index 0).
+# The data is structured in blocks of 3 columns: [Time, Concentration, Unnamed_Empty]
+column_map = {
+    0: 1,   # BGR data starts at index 0, name at index 1
+    3: 4,   # KAERI data starts at index 3, name at index 4
+    6: 7,   # NARI data starts at index 6, name at index 7
+    9: 10,  # NWMO data starts at index 9, name at index 10
+    12: 13, # SSM-UU data starts at index 12, name at index 13
+    15: 16, # SURAO data starts at index 15, name at index 16
+    18: 19  # CNSC data starts at index 18, name at index 19
+}
+df_data = pd.read_csv(file_name, header=6)
+all_arrays = {}
+
+for data_start_col, team_name_col in column_map.items():
+    team_name = df_teams.columns[team_name_col]
+    df_pair = df_data.iloc[:, data_start_col:data_start_col+2].copy()
+
+    for col in df_pair.columns:
+        df_pair[col] = pd.to_numeric(df_pair[col], errors='coerce')
+
+    df_numeric = df_pair.dropna()
+    numpy_array = df_numeric.to_numpy()
+    all_arrays[team_name] = numpy_array
+
+# Assuming 'all_arrays' is the dictionary containing the team data
+# Example structure: all_arrays = {'BGR': np.array([[t1, c1], [t2, c2], ...]), ...}
+
+# Initialize the maximum time found so far
+max_time_found = 0.0
+team_with_max_time = ""
+
+print("Checking maximum time for each simulation...")
+print("-" * 40)
+
+# Iterate through the dictionary items (team name and their data array)
+for team, data_array in all_arrays.items():
+    if data_array.size > 0:
+        # The time data is in the first column (index 0)
+        current_max_time = np.max(data_array[:, 0])
+
+        print(f"Max time for {team}: {current_max_time:.4f} years")
+
+        # Check if this is the global maximum
+        if current_max_time > max_time_found:
+            max_time_found = current_max_time
+            team_with_max_time = team
+            
+print("-" * 40)
+print(f"The **Maximum Time** among all cases is **{max_time_found:.4f} years**.")
+print(f"This maximum time was recorded in the simulation data for the **{team_with_max_time}** team.")
+
+Times = np.linspace(0, max_time_found,20) 
+# print('Times',Times)
+
+nearest_time_concentration_data = {}
+
+# Iterate through each team's data
+for team, data_array in all_arrays.items():
+    if data_array.size > 0:
+        team_times = data_array[:, 0]
+        team_concentrations = data_array[:, 1]
+        
+        # Initialize an array to store the resulting (Time, Concentration) pairs
+        result_array = np.zeros((len(Times), 2))
+        
+        # Iterate through each target time in the 'Times' array
+        for i, target_time in enumerate(Times):
+            # 1. Calculate the absolute difference between the target time and all recorded team times
+            time_diff = np.abs(team_times - target_time)
+            
+            # 2. Find the index of the minimum difference (the nearest time point)
+            nearest_index = np.argmin(time_diff)
+            
+            # 3. Retrieve the recorded time and concentration at that nearest index
+            nearest_recorded_time = team_times[nearest_index]
+            nearest_recorded_concentration = team_concentrations[nearest_index]
+            
+            # 4. Store the pair in the result array
+            result_array[i, 0] = nearest_recorded_time
+            result_array[i, 1] = nearest_recorded_concentration
+        
+        # Store the final NumPy array for the team
+        nearest_time_concentration_data[team] = result_array
+
+Teams = list(nearest_time_concentration_data.keys())
+output_features_at_times = np.zeros((len(Times),all_points_normal.shape[0],1))
+input_features_at_times = np.zeros((len(Times),all_input_features.shape[0],6))
+
+for i in range(len(Times)):
+    concentration = np.full_like(all_pressure_col,nearest_time_concentration_data[Teams[6]][i,1])
+    output_features_at_times[i,:,:] = concentration
+    input_features_at_times[i,:,:] = all_input_features
+    
+print('input features with times',input_features_at_times.shape)
+print('output features with times',output_features_at_times.shape)
+
+mat_data = {}
+mat_data['coeff'] = input_features_at_times
+mat_data['sol'] = output_features_at_times
+
+output_mat_filename = "dfn_4frac_prob.mat"
+savemat(output_mat_filename, mat_data)
+
+print(f"\nSuccessfully saved data to {output_mat_filename}")
+print("The file contains two variables:")
+print(f"  - 'coeff' (Input X): {input_features_at_times.shape}")
+print(f"  - 'sol' (Output Y): {output_features_at_times.shape}")
