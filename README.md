@@ -31,6 +31,8 @@ Save the data set file 'dfn_4frac_prob.mat'  as in the following directory, and 
   \data
     \dfn-
       dfn_4frac_prob.mat
+  
+  
   \Sp2GNO4DFN
 
 
