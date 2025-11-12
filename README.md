@@ -1,4 +1,4 @@
-Set up conda environment \n
+Set up conda environment
   conda create -n sp2gno_env python=3.8
   conda activate sp2gno_env
 Install (I have used cpu version) 
