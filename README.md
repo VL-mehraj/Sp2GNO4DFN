@@ -1,6 +1,11 @@
+----------------------------------------------------------------------------------------------------------
+DISCLAIMER -- The codes in this repository are modified codes from "https://github.com/csccm-iitd/Sp2GNO"
+
+
+----------------------------------------------------------------------------------------------------------
 Set up conda environment
-  conda create -n sp2gno_env python=3.8
-  conda activate sp2gno_env
+  conda create -n sp2gno4dfn_env python=3.8
+  conda activate sp2gno4dfn_env
 Install (I have used cpu version) 
   pip3 install torch --index-url https://download.pytorch.org/whl/cu118
   pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv  -f https://data.pyg.org/whl/torch-2.4.1+cu118.html
