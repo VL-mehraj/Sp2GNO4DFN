@@ -248,7 +248,7 @@ plt.scatter(F3_inside[:, 0], F3_pressure, s=10, label='Frac3')
 plt.scatter(F4_inside[:, 0], F4_pressure, s=10, label='Frac4')
 plt.xlabel('X coordinate (m)')
 plt.ylabel('Pressure (Pa)')
-plt.title('Pressure gradient across Frac1')
+plt.title('Pressure from East to west face across fractures')
 plt.legend()
 plt.show()
 
@@ -351,25 +351,30 @@ for team, data_array in all_arrays.items():
         nearest_time_concentration_data[team] = result_array
 
 Teams = list(nearest_time_concentration_data.keys())
-output_features_at_times = np.zeros((len(Times),all_points_normal.shape[0],1))
-input_features_at_times = np.zeros((len(Times),all_input_features.shape[0],6))
+output_features_at_times_for_teams = np.zeros((len(Teams),all_points_normal.shape[0],1,len(Times)))
+input_features_at_times = np.zeros((all_input_features.shape[0],6,len(Times)))
+input_features_for_teams = np.zeros((len(Teams),all_points_normal.shape[0],6, len(Times)))
 
-for i in range(len(Times)):
-    concentration = np.full_like(all_pressure_col,nearest_time_concentration_data[Teams[6]][i,1])
-    output_features_at_times[i,:,:] = concentration
-    input_features_at_times[i,:,:] = all_input_features
+
+for T in range(len(Teams)):
+    for i in range(len(Times)):
+        concentration = np.full_like(all_pressure_col,nearest_time_concentration_data[Teams[T]][i,1])
+        output_features_at_times_for_teams[T,:,:,i] = concentration
+        input_features_at_times[:,:, i] = all_input_features
+    input_features_for_teams[T,:,:,:] = input_features_at_times[:,:,:]
     
 print('input features with times',input_features_at_times.shape)
-print('output features with times',output_features_at_times.shape)
+print('input features for teams',input_features_for_teams.shape)
+print('output features with times',output_features_at_times_for_teams.shape)
 
 mat_data = {}
-mat_data['coeff'] = input_features_at_times
-mat_data['sol'] = output_features_at_times
+mat_data['coeff'] = input_features_for_teams
+mat_data['sol'] = output_features_at_times_for_teams
 
 output_mat_filename = "dfn_4frac_prob.mat"
 savemat(output_mat_filename, mat_data)
 
 print(f"\nSuccessfully saved data to {output_mat_filename}")
 print("The file contains two variables:")
-print(f"  - 'coeff' (Input X): {input_features_at_times.shape}")
-print(f"  - 'sol' (Output Y): {output_features_at_times.shape}")
+print(f"  - 'coeff' (Input X): {input_features_for_teams.shape}")
+print(f"  - 'sol' (Output Y): {output_features_at_times_for_teams.shape}")
